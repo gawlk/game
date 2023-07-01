@@ -1,0 +1,1 @@
+pub const FIXED_UPDATE_DELTA_TIME: f32 = 1.0 / 60.0;
