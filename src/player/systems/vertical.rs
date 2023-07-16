@@ -1,9 +1,6 @@
 use bevy::prelude::*;
 
-use crate::{
-    level::{check_no_walls, Level, PIXEL},
-    physics::{RectCollider, Velocity, FIXED_UPDATE_DELTA_TIME},
-};
+use crate::{colliders::RectCollider, level::Level};
 
 use super::*;
 
@@ -11,135 +8,265 @@ pub fn player_vertical(
     level: Res<Level>,
     mut commands: Commands,
     query: Query<(Entity, &PlayerActions, &Transform, &RectCollider)>,
-    mut query_mut: Query<(&mut Velocity, &mut PlayerVerticalState), With<Player>>,
+    mut query_mut: Query<(
+        &mut PlayerVelocityX,
+        &mut PlayerVelocityY,
+        &mut PlayerVerticalState,
+    )>,
+    query_coyote_timer_opt: Query<&mut PlayerCoyoteTimer>,
+    mut query_jump_buffer_opt: Query<&mut PlayerJumpBuffer>,
+    mut query_locked_movement_opt: Query<&mut PlayerLockedMovement>,
 ) {
     if query.is_empty() || query_mut.is_empty() {
         return;
     }
 
-    let (player, &PlayerActions { jump, down, .. }, transform, collider) = query.single();
+    let (
+        player,
+        &PlayerActions {
+            down,
+            jump,
+            rise,
+            left,
+            right,
+            ..
+        },
+        transform,
+        collider,
+    ) = query.single();
 
-    let (mut velocity, mut vertical) = query_mut.single_mut();
+    let (mut velocity_x, mut velocity_y, mut vertical_state) = query_mut.single_mut();
 
-    let delta = FIXED_UPDATE_DELTA_TIME;
+    let grounded = level.touches_floor(transform, collider);
 
-    let rise_gravity: f32 = compute_gravity(PLAYER_RISE_HALF_TIME);
-    let fall_gravity: f32 = compute_gravity(PLAYER_FALL_HALF_TIME);
+    // dbg!(grounded, transform.translation.y - collider.y - PIXEL);
 
-    // Also equals to = gravity * timeToJumpApex;
-    let rise_init_velocity_y: f32 = compute_init_velocity_y(PLAYER_RISE_HALF_TIME);
-    let fall_init_velocity_y: f32 = compute_init_velocity_y(PLAYER_FALL_HALF_TIME);
+    // TODO: Set only on new platform
+    velocity_y.reset_states_variables();
 
-    let rise_time_at_jump_minus_min_jump: f32 =
-        compute_time_at_height(rise_init_velocity_y, rise_gravity);
-    let fall_time_at_jump_minus_min_jump: f32 =
-        compute_time_at_height(fall_init_velocity_y, fall_gravity);
-
-    let is_grounded = !check_no_walls(
-        &level,
-        transform.translation.x,
-        transform.translation.y - PIXEL,
-        collider.y,
-        false,
-    );
-
-    match &mut *vertical {
+    match &mut *vertical_state {
         PlayerVerticalState::Grounded => {
-            info!("grounded");
+            let buffer = query_jump_buffer_opt.get_single_mut().is_ok();
 
-            if jump {
-                commands.entity(player).remove::<PlayerVerticalState>();
+            commands.entity(player).remove::<PlayerCoyoteTimer>();
+            commands.entity(player).remove::<PlayerLockedMovement>();
 
-                commands
-                    .entity(player)
-                    .insert(PlayerVerticalState::Rising(0.0));
-            } else if !is_grounded {
-                commands.entity(player).remove::<PlayerVerticalState>();
+            if jump || buffer {
+                swap_state_to_rise(&mut commands, player);
+            } else if !grounded {
+                swap_state(&mut commands, player, PlayerVerticalState::default_fall());
 
-                commands
-                    .entity(player)
-                    .insert(PlayerVerticalState::Falling(PLAYER_FALL_HALF_TIME));
+                commands.entity(player).insert(PlayerCoyoteTimer::new());
             }
         }
-        PlayerVerticalState::Rising(t_ref) => {
-            info!("rising");
+        PlayerVerticalState::Rising(timer) => {
+            let wall_jump = jump
+                && process_wall_jump(
+                    &level,
+                    &mut commands,
+                    player,
+                    transform,
+                    collider,
+                    &mut velocity_x,
+                    &mut query_locked_movement_opt,
+                    false,
+                    false,
+                );
 
-            *t_ref += delta;
-
-            let t = *t_ref;
-
-            let y_at_current_frame = compute_y(t, rise_gravity, rise_init_velocity_y);
-
-            // TODO: Save previous computation instead redoing it every time
-            let y_at_last_frame = compute_y(t - delta, rise_gravity, rise_init_velocity_y);
-
-            velocity.y = y_at_current_frame - y_at_last_frame;
-
-            let timer_over = t >= PLAYER_RISE_HALF_TIME;
-
-            let early_release = !jump && t <= rise_time_at_jump_minus_min_jump;
-
-            if timer_over || early_release {
-                commands.entity(player).remove::<PlayerVerticalState>();
-
-                let new_t = {
-                    if early_release {
-                        fall_time_at_jump_minus_min_jump
-                    } else {
-                        t - PLAYER_RISE_HALF_TIME + PLAYER_FALL_HALF_TIME
-                    }
-                };
-
-                commands
-                    .entity(player)
-                    .insert(PlayerVerticalState::Falling(new_t));
-            }
-        }
-        PlayerVerticalState::Falling(t_ref) => {
-            if is_grounded {
-                commands.entity(player).remove::<PlayerVerticalState>();
-
-                commands
-                    .entity(player)
-                    .insert(PlayerVerticalState::Grounded);
+            if wall_jump {
                 return;
             }
 
-            *t_ref = (*t_ref + delta).min(PLAYER_FALL_HALF_TIME * 2.0);
+            timer.tick();
 
-            let t = *t_ref;
-            dbg!("falling", t);
+            let t = timer.get();
 
-            let y_at_current_frame = compute_y(t, fall_gravity, fall_init_velocity_y);
-            let y_at_last_frame = compute_y(t - delta, fall_gravity, fall_init_velocity_y);
+            velocity_y.compute_rising(t);
 
-            let max_speed = if down {
+            dbg!(t, velocity_y.rise_time_at_max_height_minus_min_height);
+
+            let button_released = !rise
+                && t < velocity_y.rise_time_at_max_height_minus_min_height
+                && query_locked_movement_opt.get_single_mut().is_err();
+
+            let rise_over = timer.is_over();
+
+            let touches_ceiling = level.touches_ceiling(transform, collider);
+
+            if button_released || rise_over || touches_ceiling {
+                let fall_state = {
+                    if button_released {
+                        PlayerVerticalState::new_fall(
+                            velocity_y.fall_time_at_max_height_minus_min_height,
+                        )
+                    } else {
+                        PlayerVerticalState::default_fall()
+                    }
+                };
+
+                swap_state(&mut commands, player, fall_state);
+            }
+        }
+        PlayerVerticalState::Falling(timer) => {
+            if grounded {
+                swap_state(&mut commands, player, PlayerVerticalState::Grounded);
+                return;
+            }
+
+            if process_query_coyote_timer(query_coyote_timer_opt, &mut commands, player, jump) {
+                return;
+            }
+
+            process_query_jump_buffer(query_jump_buffer_opt, &mut commands, player, jump);
+
+            // TODO: Only check from origin to bottom instead of top to bottom and check if all colliding
+            let touches_left_wall = level.touches_wall(transform, collider, 0.0, true);
+            let touches_right_wall = level.touches_wall(transform, collider, 0.0, false);
+
+            let wall_jump = jump
+                && process_wall_jump(
+                    &level,
+                    &mut commands,
+                    player,
+                    transform,
+                    collider,
+                    &mut velocity_x,
+                    &mut query_locked_movement_opt,
+                    touches_left_wall,
+                    touches_right_wall,
+                );
+
+            if wall_jump {
+                return;
+            }
+
+            let slide_left = left && touches_left_wall;
+            let slide_right = right && touches_right_wall;
+            let slide = slide_left || slide_right;
+
+            let max_speed = if slide {
+                PLAYER_SLIDE_MAX_SPEED
+            } else if down {
                 PLAYER_FAST_FALL_MAX_SPEED
             } else {
                 PLAYER_FALL_MAX_SPEED
             };
 
-            velocity.y = (y_at_current_frame - y_at_last_frame).min(-max_speed);
+            timer.tick();
+
+            velocity_y.compute_falling(timer.get(), max_speed);
         }
     }
 }
 
-fn compute_y(t: f32, gravity: f32, init_velocity: f32) -> f32 {
-    0.5 * gravity * t * t + init_velocity * t
+fn swap_state_to_rise(commands: &mut Commands, player: Entity) {
+    commands.entity(player).remove::<PlayerCoyoteTimer>();
+    commands.entity(player).remove::<PlayerJumpBuffer>();
+
+    swap_state(commands, player, PlayerVerticalState::default_rise());
 }
 
-fn compute_gravity(half_time: f32) -> f32 {
-    (-2.0 * PLAYER_JUMP_HEIGHT) / (half_time * half_time)
+fn swap_state(commands: &mut Commands, player: Entity, new_state: PlayerVerticalState) {
+    commands.entity(player).remove::<PlayerVerticalState>();
+
+    commands.entity(player).insert(new_state);
 }
 
-fn compute_init_velocity_y(half_time: f32) -> f32 {
-    (2.0 * PLAYER_JUMP_HEIGHT) / half_time
+fn process_query_coyote_timer(
+    mut query_coyote_timer_opt: Query<&mut PlayerCoyoteTimer>,
+    commands: &mut Commands,
+    player: Entity,
+    jump: bool,
+) -> bool {
+    if let Ok(mut coyote_timer) = query_coyote_timer_opt.get_single_mut() {
+        coyote_timer.tick();
+
+        if jump || coyote_timer.is_over() {
+            commands.entity(player).remove::<PlayerCoyoteTimer>();
+
+            if jump {
+                swap_state_to_rise(commands, player);
+
+                return true;
+            }
+        }
+    }
+
+    false
 }
 
-fn compute_time_at_height(init_velocity_y: f32, gravity: f32) -> f32 {
-    (-init_velocity_y
-        + (init_velocity_y * init_velocity_y
-            - 4.0 * 0.5 * gravity * (PLAYER_MIN_JUMP_HEIGHT - PLAYER_JUMP_HEIGHT))
-            .sqrt())
-        / (2.0 * 0.5 * gravity)
+fn process_query_jump_buffer(
+    mut query_jump_buffer_opt: Query<&mut PlayerJumpBuffer>,
+    commands: &mut Commands,
+    player: Entity,
+    jump: bool,
+) -> bool {
+    if let Ok(mut jump_buffer) = query_jump_buffer_opt.get_single_mut() {
+        if jump {
+            jump_buffer.reset();
+        } else {
+            jump_buffer.tick();
+
+            if jump_buffer.is_over() {
+                commands.entity(player).remove::<PlayerJumpBuffer>();
+
+                return false;
+            }
+        }
+
+        true
+    } else if jump {
+        commands.entity(player).insert(PlayerJumpBuffer::new());
+
+        true
+    } else {
+        false
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn process_wall_jump(
+    level: &Level,
+    commands: &mut Commands,
+    player: Entity,
+    transform: &Transform,
+    collider: &RectCollider,
+    velocity_x: &mut PlayerVelocityX,
+    query_locked_movement_opt: &mut Query<&mut PlayerLockedMovement>,
+    precomputed_touches_left_wall: bool,
+    precomputed_touches_right_wall: bool,
+) -> bool {
+    let close_to_left_wall = {
+        if precomputed_touches_right_wall {
+            false
+        } else {
+            precomputed_touches_left_wall
+                || level.touches_wall(transform, collider, PLAYER_WALL_JUMP_PAD, true)
+        }
+    };
+
+    let close_to_right_wall = {
+        if close_to_left_wall {
+            false
+        } else {
+            precomputed_touches_right_wall
+                || level.touches_wall(transform, collider, PLAYER_WALL_JUMP_PAD, false)
+        }
+    };
+
+    if close_to_left_wall || close_to_right_wall {
+        swap_state_to_rise(commands, player);
+
+        if let Ok(mut locked_movement) = query_locked_movement_opt.get_single_mut() {
+            locked_movement.reset();
+        } else {
+            commands.entity(player).insert(PlayerLockedMovement::new());
+        }
+
+        velocity_x.set_to_max(close_to_right_wall);
+
+        true
+    } else {
+        false
+    }
 }

@@ -1,9 +1,8 @@
 use bevy::prelude::*;
-use rand::seq::SliceRandom;
 
 use crate::{
-    level::{Level, PIXELS_PER_TILE},
-    physics::{RectCollider, Velocity},
+    colliders::RectCollider,
+    level::{Level, PIXELS_PER_METER},
     sprites::{AnimationBundle, AnimationIndexes, AnimationTimer},
 };
 
@@ -11,21 +10,18 @@ use super::*;
 
 pub fn spawn_player(
     mut commands: Commands,
-    query_player: Query<(), With<Player>>,
     level: Res<Level>,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    query_player: Query<(), With<Player>>,
 ) {
     if !query_player.is_empty() {
         return;
     }
 
-    let coords = level
-        .spawns
-        .choose(&mut rand::thread_rng())
-        .map(|coords| coords.to_owned());
+    let spawn = level.get_random_spawn();
 
-    if let Some((x, y)) = coords {
+    if let Some((x, y)) = spawn {
         let texture_handle = asset_server.load("aseprite/base_idle.png");
 
         let column_number = 1;
@@ -51,15 +47,15 @@ pub fn spawn_player(
         commands.spawn(PlayerBundle {
             player: Player,
             actions: PlayerActions::default(),
-            vertical: PlayerVerticalState::Falling(PLAYER_FALL_HALF_TIME),
+            vertical: PlayerVerticalState::default_fall(),
             collider: RectCollider(Vec2::new(2.5, 9.5)),
-            velocity: Velocity::default(),
+            velocity: PlayerVelocityBundle::default(),
             sprite_sheet_bundle: SpriteSheetBundle {
                 texture_atlas: texture_atlas_handle,
                 transform: Transform {
                     translation: Vec3::new(
-                        (x as f32) * PIXELS_PER_TILE,
-                        (y as f32) * PIXELS_PER_TILE,
+                        (x as f32) * PIXELS_PER_METER,
+                        (y as f32) * PIXELS_PER_METER,
                         0.0,
                     ),
                     ..default()

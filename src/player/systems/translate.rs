@@ -1,29 +1,35 @@
 use bevy::prelude::*;
 
 use crate::{
-    level::{check_no_walls, Level, PIXELS_PER_TILE},
-    physics::{RectCollider, Velocity},
+    colliders::RectCollider,
+    level::{Level, PIXELS_PER_METER, PIXELS_PER_TILE},
 };
 
 use super::*;
 
 pub fn translate_player(
     level: Res<Level>,
-    mut query_player: Query<(&Velocity, &mut Transform, &RectCollider), With<Player>>,
+    mut query: Query<(
+        &PlayerVelocityX,
+        &PlayerVelocityY,
+        &RectCollider,
+        &mut Transform,
+    )>,
 ) {
-    if query_player.is_empty() {
+    if query.is_empty() {
         return;
     }
 
-    let (velocity, mut transform, rect_collider) = query_player.single_mut();
+    let (velocity_x, velocity_y, rect_collider, mut transform) = query.single_mut();
 
-    let corrected_velocity_x = velocity.x * PIXELS_PER_TILE;
-    let corrected_velocity_y = velocity.y * PIXELS_PER_TILE;
+    let fixed_velocity_x = velocity_x.get_fixed() * PIXELS_PER_METER;
 
-    if corrected_velocity_x == 0.0 && corrected_velocity_y == 0.0 {
+    let fixed_velocity_y = velocity_y.get_fixed() * PIXELS_PER_METER;
+
+    if fixed_velocity_x == 0.0 && fixed_velocity_y == 0.0 {
         return;
-    } else if corrected_velocity_x >= PIXELS_PER_TILE || corrected_velocity_y >= PIXELS_PER_TILE {
-        panic!("A velocity higher than the number of pixels isn't supported");
+    } else if fixed_velocity_x >= PIXELS_PER_TILE || fixed_velocity_y >= PIXELS_PER_TILE {
+        panic!("A velocity higher than the number of pixels in a tile isn't supported");
     }
 
     let collider_x = rect_collider.x;
@@ -31,26 +37,26 @@ pub fn translate_player(
 
     let translation = &mut transform.translation;
 
-    if corrected_velocity_x != 0.0 {
+    if fixed_velocity_x != 0.0 {
         translation.x = compute_translation(
             &level,
             translation.x,
             translation.y,
             collider_x,
             collider_y,
-            corrected_velocity_x,
+            fixed_velocity_x,
             false,
         );
     }
 
-    if corrected_velocity_y != 0.0 {
+    if fixed_velocity_y != 0.0 {
         translation.y = compute_translation(
             &level,
             translation.y,
             translation.x,
             collider_y,
             collider_x,
-            corrected_velocity_y,
+            fixed_velocity_y,
             true,
         );
     }
@@ -71,8 +77,7 @@ fn compute_translation(
 
     let collider_directed = collider * sign;
 
-    let no_walls = check_no_walls(
-        level,
+    let no_walls = level.check_no_walls(
         desired + collider_directed,
         perpendicular_origin,
         perpendicular_collider,

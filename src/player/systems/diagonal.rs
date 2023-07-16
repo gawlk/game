@@ -1,23 +1,17 @@
 use bevy::prelude::*;
 
-use crate::physics::{Velocity, FIXED_UPDATE_DELTA_TIME};
-
 use super::*;
 
 #[allow(dead_code)]
 pub fn player_diagonal(
     query: Query<&PlayerActions>,
-    mut query_mut: Query<&mut Velocity, With<Player>>,
+    mut query_mut: Query<(&mut PlayerVelocityX, &mut PlayerVelocityY)>,
 ) {
     if query.is_empty() || query_mut.is_empty() {
         return;
     }
 
-    let mut velocity = query_mut.single_mut();
-
-    let speed = PLAYER_RUN_MAX_SPEED * FIXED_UPDATE_DELTA_TIME;
-
-    dbg!(speed);
+    let (mut velocity_x, mut velocity_y) = query_mut.single_mut();
 
     let &PlayerActions {
         left,
@@ -27,25 +21,21 @@ pub fn player_diagonal(
         ..
     } = query.single();
 
-    velocity.x = 0.0;
+    velocity_x.reset();
 
-    if left || right {
-        if left {
-            velocity.x -= speed;
-        }
-        if right {
-            velocity.x += speed;
-        }
+    if left != right {
+        velocity_x.set_to_max(left);
     }
 
-    velocity.y = 0.0;
+    velocity_y.reset();
 
-    if down || up {
+    if down != up {
+        let speed = PLAYER_RUN_MAX_SPEED;
+
         if down {
-            velocity.y -= speed;
-        }
-        if up {
-            velocity.y += speed;
+            velocity_y.set(-speed);
+        } else {
+            velocity_y.set(speed);
         }
     }
 }

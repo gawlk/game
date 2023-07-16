@@ -1,8 +1,9 @@
+#![allow(dead_code)]
 use bevy::prelude::*;
 
 use crate::{
+    colliders::RectCollider,
     level::{Level, PIXELS_PER_TILE},
-    physics::RectCollider,
     player::Player,
 };
 

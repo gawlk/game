@@ -1,13 +1,13 @@
 use bevy::{prelude::*, render::texture::ImageSampler, window::WindowResolution};
 
 mod camera;
+mod colliders;
 mod fps;
 mod gizmos;
-mod input;
 mod level;
-mod physics;
 mod player;
 mod sprites;
+mod time;
 mod utils;
 mod walls;
 
@@ -32,11 +32,10 @@ fn main() -> color_eyre::Result<()> {
             camera::CameraPlugin,
             fps::FPSPlugin,
             gizmos::GizmosPlugin,
-            input::InputPlugin,
             level::LevelPlugin,
             player::PlayerPlugin,
-            physics::PhysicsPlugin,
             sprites::SpritesPlugin,
+            time::TimePlugin,
             walls::WallsPlugin,
         ))
         .run();

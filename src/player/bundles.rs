@@ -1,9 +1,6 @@
 use bevy::prelude::*;
 
-use crate::{
-    physics::{RectCollider, Velocity},
-    sprites::AnimationBundle,
-};
+use crate::{colliders::RectCollider, sprites::AnimationBundle};
 
 use super::*;
 
@@ -13,7 +10,13 @@ pub struct PlayerBundle {
     pub actions: PlayerActions,
     pub vertical: PlayerVerticalState,
     pub collider: RectCollider,
-    pub velocity: Velocity,
+    pub velocity: PlayerVelocityBundle,
     pub sprite_sheet_bundle: SpriteSheetBundle,
     pub animation_bundle: AnimationBundle,
+}
+
+#[derive(Bundle, Default)]
+pub struct PlayerVelocityBundle {
+    pub x: PlayerVelocityX,
+    pub y: PlayerVelocityY,
 }
