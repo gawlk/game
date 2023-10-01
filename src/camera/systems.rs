@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::player::Player;
+use crate::player::PlayerMarker;
 
 use super::*;
 
@@ -13,8 +13,8 @@ pub fn spawn_camera(mut commands: Commands) {
 }
 
 pub fn move_camera(
-    mut query_camera_transform: Query<&mut Transform, (With<Camera>, Without<Player>)>,
-    query_player_transform: Query<&Transform, With<Player>>,
+    mut query_camera_transform: Query<&mut Transform, (With<Camera>, Without<PlayerMarker>)>,
+    query_player_transform: Query<&Transform, With<PlayerMarker>>,
 ) {
     if query_player_transform.is_empty() || query_camera_transform.is_empty() {
         return;

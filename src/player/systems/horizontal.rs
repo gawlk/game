@@ -1,17 +1,19 @@
 use bevy::prelude::*;
 
+use crate::time::TickerComponent;
+
 use super::*;
 
 pub fn player_horizontal(
     query: Query<(&PlayerActions, &PlayerVerticalState)>,
     mut query_mut: Query<&mut PlayerVelocityX>,
-    mut query_locked_movement_opt: Query<&mut PlayerLockedMovement>,
+    query_locked_movement_opt: Query<&TickerComponent, With<WallJumpLockMarker>>,
 ) {
     if query.is_empty() || query_mut.is_empty() {
         return;
     }
 
-    if query_locked_movement_opt.get_single_mut().is_ok() {
+    if query_locked_movement_opt.get_single().is_ok() {
         return;
     }
 

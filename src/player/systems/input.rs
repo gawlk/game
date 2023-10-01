@@ -31,4 +31,8 @@ pub fn process_player_inputs(
     player_actions.jump = input.any_just_pressed(key_codes_jump);
 
     player_actions.rise = input.any_pressed(key_codes_jump);
+
+    if player_actions.jump {
+        println!("Jump pressed")
+    }
 }

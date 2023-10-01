@@ -85,7 +85,7 @@ impl Level {
 
     pub fn touches_floor(&self, transform: &Transform, collider: &RectCollider) -> bool {
         !self.check_no_walls(
-            transform.translation.y - collider.y - PIXEL,
+            transform.translation.y - collider.y - CENTIPIXEL,
             transform.translation.x,
             collider.x,
             true,
@@ -94,7 +94,7 @@ impl Level {
 
     pub fn touches_ceiling(&self, transform: &Transform, collider: &RectCollider) -> bool {
         !self.check_no_walls(
-            transform.translation.y + collider.y + PIXEL,
+            transform.translation.y + collider.y + CENTIPIXEL,
             transform.translation.x,
             collider.x,
             true,
@@ -118,8 +118,6 @@ impl Level {
         )
     }
 
-    // TODO: Fix rounding
-    // For example touches_floor returns true when less than 8 pixels between collider and floor
     pub fn check_no_walls(
         &self,
         pixel_index: f32,

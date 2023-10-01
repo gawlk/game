@@ -1,10 +1,11 @@
 #![allow(dead_code)]
+
 use bevy::prelude::*;
 
 use crate::{
     colliders::RectCollider,
     level::{Level, PIXELS_PER_TILE},
-    player::Player,
+    player::PlayerMarker,
 };
 
 pub fn gizmos_origin(mut gizmos: Gizmos) {
@@ -41,7 +42,7 @@ pub fn gizmos_static_collisions(mut gizmos: Gizmos, level: Res<Level>) {
 
 pub fn gizmos_player(
     mut gizmos: Gizmos,
-    query_player_transform: Query<(&Transform, &RectCollider), With<Player>>,
+    query_player_transform: Query<(&Transform, &RectCollider), With<PlayerMarker>>,
 ) {
     if query_player_transform.is_empty() {
         return;

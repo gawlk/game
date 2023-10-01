@@ -38,9 +38,9 @@ impl PlayerVelocityY {
 
         let max_fall_speed = -max_speed * FIXED_UPDATE_DELTA_TIME;
 
-        dbg!(velocity, max_fall_speed);
+        let caped_velocity = velocity.max(max_fall_speed);
 
-        self.set(velocity.max(max_fall_speed));
+        self.set(caped_velocity);
     }
 
     pub fn reset(&mut self) {

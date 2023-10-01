@@ -8,3 +8,9 @@ pub struct AnimationIndexes {
 
 #[derive(Component, Deref, DerefMut)]
 pub struct AnimationTimer(pub Timer);
+
+#[derive(Component)]
+pub enum SpriteDirection {
+    Right,
+    Left,
+}

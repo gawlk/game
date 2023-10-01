@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::{
     colliders::RectCollider,
     level::{Level, PIXELS_PER_METER},
-    sprites::{AnimationBundle, AnimationIndexes, AnimationTimer},
+    sprites::{AnimationBundle, AnimationIndexes, AnimationTimer, SpriteDirection},
 };
 
 use super::*;
@@ -13,7 +13,7 @@ pub fn spawn_player(
     level: Res<Level>,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
-    query_player: Query<(), With<Player>>,
+    query_player: Query<(), With<PlayerMarker>>,
 ) {
     if !query_player.is_empty() {
         return;
@@ -45,9 +45,9 @@ pub fn spawn_player(
         };
 
         commands.spawn(PlayerBundle {
-            player: Player,
+            marker: PlayerMarker,
             actions: PlayerActions::default(),
-            vertical: PlayerVerticalState::default_fall(),
+            vertical: PlayerVerticalState::default_falling(),
             collider: RectCollider(Vec2::new(2.5, 9.5)),
             velocity: PlayerVelocityBundle::default(),
             sprite_sheet_bundle: SpriteSheetBundle {
@@ -66,6 +66,7 @@ pub fn spawn_player(
                 animation_indexes,
                 animation_timer: AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
             },
+            direction: SpriteDirection::Right,
         });
     }
 }

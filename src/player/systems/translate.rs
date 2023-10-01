@@ -20,7 +20,7 @@ pub fn translate_player(
         return;
     }
 
-    let (velocity_x, velocity_y, rect_collider, mut transform) = query.single_mut();
+    let (velocity_x, velocity_y, collider, mut transform) = query.single_mut();
 
     let fixed_velocity_x = velocity_x.get_fixed() * PIXELS_PER_METER;
 
@@ -32,8 +32,8 @@ pub fn translate_player(
         panic!("A velocity higher than the number of pixels in a tile isn't supported");
     }
 
-    let collider_x = rect_collider.x;
-    let collider_y = rect_collider.y;
+    let collider_x = collider.x;
+    let collider_y = collider.y;
 
     let translation = &mut transform.translation;
 

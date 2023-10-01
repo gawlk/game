@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 // All speeds are in SI (m/s)
 
 pub const PLAYER_RUN_MAX_SPEED: f32 = 11.0;
@@ -32,4 +34,4 @@ pub const PLAYER_FALL_HALF_TIME: f32 = PLAYER_JUMP_TIME - PLAYER_RISE_HALF_TIME;
 
 pub const PLAYER_WALL_JUMP_SPEED: f32 = PLAYER_AIR_MAX_SPEED;
 pub const PLAYER_WALL_JUMP_LOCKED_TIME: f32 = 0.3;
-pub const PLAYER_WALL_JUMP_PAD: f32 = 2.0;
+pub const PLAYER_WALL_JUMP_PAD: f32 = 1.0;

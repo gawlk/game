@@ -1,11 +1,13 @@
 use bevy::prelude::*;
 
+use crate::time::TickerComponent;
+
 use super::*;
 
 pub fn player_lock(
     mut commands: Commands,
-    query: Query<Entity, With<Player>>,
-    mut query_locked_movement_opt: Query<&mut PlayerLockedMovement>,
+    query: Query<Entity, With<PlayerMarker>>,
+    mut query_locked_movement_opt: Query<&mut TickerComponent, With<WallJumpLockMarker>>,
 ) {
     if query.is_empty() {
         return;
@@ -17,7 +19,7 @@ pub fn player_lock(
         locked_movement.tick();
 
         if locked_movement.is_over() {
-            commands.entity(player).remove::<PlayerLockedMovement>();
+            commands.entity(player).remove::<WallJumpLockBundle>();
         }
     }
 }
